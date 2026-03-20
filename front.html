@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroMX · Buscador de Rutas BFS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sky: #0A1628;
+      --sky2: #0D1F3C;
+      --sky3: #122552;
+      --gold: #F5A623;
+      --gold2: #FFCC6B;
+      --blue-acc: #4AB3E8;
+      --green-acc: #3ECBA1;
+      --red-acc: #FF6B6B;
+      --text: #E8EDF5;
+      --text2: #9AAAC0;
+      --border: rgba(255,255,255,0.08);
+      --card: rgba(255,255,255,0.04);
+      --card2: rgba(255,255,255,0.07);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--sky);
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    #stars-svg {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 0;
+    }
+
+    .header {
+      position: relative; z-index: 2;
+      background: var(--sky2);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex; align-items: center; gap: 12px;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px; font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.03em;
+    }
+    .logo span { color: var(--blue-acc); }
+
+    .tagline {
+      font-size: 12px; color: var(--text2);
+      margin-left: auto;
+      font-weight: 300; letter-spacing: 0.05em;
+    }
+
+    .body {
+      position: relative; z-index: 2;
+      padding: 20px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .panel-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px; font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .panel-title svg { width: 14px; height: 14px; }
+
+    label {
+      display: block;
+      font-size: 12px; color: var(--text2);
+      margin-bottom: 5px; margin-top: 10px;
+      font-weight: 500; letter-spacing: 0.04em;
+    }
+    label:first-of-type { margin-top: 0; }
+
+    select {
+      width: 100%;
+      background: var(--sky3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239AAAC0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
+    }
+    select:focus { border-color: var(--gold); }
+    select option { background: #0D1F3C; }
+
+    .btn {
+      width: 100%;
+      margin-top: 14px;
+      padding: 11px;
+      background: var(--gold);
+      color: #0A1628;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px; font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      text-transform: uppercase;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn:hover { background: var(--gold2); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { background: #3a4a5e; color: #667; cursor: not-allowed; }
+
+    .btn-reset {
+      margin-top: 6px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 11px;
+    }
+    .btn-reset:hover { background: var(--card2); }
+
+    .stats-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px; margin-bottom: 14px;
+    }
+
+    .stat {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px; font-weight: 700;
+      color: var(--blue-acc);
+      display: block;
+    }
+    .stat-val.gold { color: var(--gold); }
+    .stat-val.green { color: var(--green-acc); }
+
+    .stat-lbl {
+      font-size: 10px; color: var(--text2);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      display: block; margin-top: 2px;
+    }
+
+    .route-container { overflow-x: auto; padding-bottom: 4px; }
+
+    .route-track {
+      display: flex; align-items: center;
+      gap: 0; min-width: max-content;
+      padding: 2px 0;
+    }
+
+    .route-city {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 4px; min-width: 72px;
+    }
+
+    .city-dot {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--sky3);
+      border: 2px solid var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.02em;
+      text-align: center; line-height: 1.1;
+    }
+
+    .city-dot.start { background: rgba(245,166,35,0.15); border-color: var(--gold); }
+    .city-dot.end { background: rgba(62,203,161,0.15); border-color: var(--green-acc); color: var(--green-acc); }
+
+    .city-name {
+      font-size: 10px; color: var(--text2);
+      text-align: center; line-height: 1.3;
+      max-width: 72px; word-break: break-word;
+    }
+    .city-name.bold { color: var(--text); font-weight: 500; }
+
+    .flight-arrow {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 0 2px; margin-bottom: 20px;
+    }
+
+    .arrow-line {
+      width: 28px; height: 2px;
+      background: linear-gradient(90deg, rgba(74,179,232,0.3), rgba(74,179,232,0.8));
+      position: relative;
+    }
+    .arrow-line::after {
+      content: '';
+      position: absolute; right: -4px; top: -3px;
+      border-left: 6px solid var(--blue-acc);
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+    }
+
+    .plane-icon { font-size: 11px; margin-bottom: 3px; }
+
+    .no-route {
+      text-align: center; padding: 24px;
+      color: var(--red-acc); font-size: 13px;
+    }
+
+    .vis-area {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--sky);
+      overflow: auto;
+      max-height: 280px;
+      padding: 12px;
+    }
+
+    .node-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+
+    .vnode {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 10px; font-weight: 500;
+      border: 1px solid;
+      letter-spacing: 0.03em;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.2s;
+    }
+
+    .vnode.frontier {
+      border-color: rgba(74,179,232,0.6);
+      background: rgba(74,179,232,0.12);
+      color: var(--blue-acc);
+      animation: pulse 0.8s ease-in-out;
+    }
+
+    .vnode.visited {
+      border-color: rgba(155,155,155,0.25);
+      background: rgba(255,255,255,0.03);
+      color: var(--text2);
+    }
+
+    .vnode.solution {
+      border-color: rgba(62,203,161,0.7);
+      background: rgba(62,203,161,0.15);
+      color: var(--green-acc);
+      font-weight: 700;
+    }
+
+    .vnode.current {
+      border-color: rgba(245,166,35,0.7);
+      background: rgba(245,166,35,0.12);
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .log-area {
+      font-size: 11px; color: var(--text2);
+      line-height: 1.7;
+      max-height: 120px;
+      overflow-y: auto;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .log-entry { padding: 1px 0; }
+    .log-entry.highlight { color: var(--gold); font-weight: 500; }
+    .log-entry.found { color: var(--green-acc); font-weight: 700; }
+
+    .step-info {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 10px; font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .badge.blue {
+      background: rgba(74,179,232,0.12);
+      color: var(--blue-acc);
+      border: 1px solid rgba(74,179,232,0.3);
+    }
+    .badge.amber {
+      background: rgba(245,166,35,0.1);
+      color: var(--gold);
+      border: 1px solid rgba(245,166,35,0.25);
+    }
+    .badge.green {
+      background: rgba(62,203,161,0.1);
+      color: var(--green-acc);
+      border: 1px solid rgba(62,203,161,0.25);
+    }
+
+    .empty-state {
+      text-align: center; padding: 32px 16px;
+      color: var(--text2); font-size: 12px; line-height: 1.7;
+    }
+    .empty-state svg { opacity: 0.3; margin-bottom: 8px; }
+
+    .speed-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    }
+    .speed-row label { margin: 0; flex: 0 0 auto; font-size: 11px; }
+    .speed-row input { flex: 1; }
+    .speed-val { font-size: 11px; color: var(--gold); min-width: 52px; text-align: right; }
+
+    .section-divider {
+      grid-column: 1 / -1;
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .full-col { grid-column: 1 / -1; }
+
+    .log-label {
+      margin-top: 10px;
+      font-size: 10px; color: var(--text2);
+      font-weight: 500; letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 3px;
+      background: var(--sky3);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--gold);
+      cursor: pointer;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--gold);
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<svg id="stars-svg"></svg>
+
+<div class="header">
+  <div class="logo">AERO<span>MX</span></div>
+  <div style="font-size:12px;color:var(--text2);font-weight:300;">Buscador de rutas · BFS</div>
+  <div class="tagline">Búsqueda en Amplitud · México</div>
+</div>
+
+<div class="body">
+  <div class="grid">
+
+    <!-- PANEL: Configuración -->
+    <div class="panel">
+      <div class="panel-title">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M8 2L14 6V10L8 14L2 10V6L8 2Z" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        Configurar Vuelo
+      </div>
+
+      <label>Ciudad origen</label>
+      <select id="sel-origen"></select>
+
+      <label>Ciudad destino</label>
+      <select id="sel-destino"></select>
+
+      <div class="speed-row">
+        <label>Velocidad BFS</label>
+        <input type="range" min="1" max="5" value="3" id="speed-range">
+        <span class="speed-val" id="speed-label">Normal</span>
+      </div>
+
+      <button class="btn" id="btn-buscar" onclick="iniciarBFS()">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8L13 8M9 4L13 8L9 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Buscar Ruta
+      </button>
+
+      <button class="btn btn-reset" onclick="resetear()">
+        Reiniciar
+      </button>
+    </div>
+
+    <!-- PANEL: Resultado ruta -->
+    <div class="panel">
+      <div class="panel-title">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M2 8h12M8 2l6 6-6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Ruta Encontrada
+      </div>
+
+      <div id="resultado-panel">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="1"/>
+            <path d="M12 20h16M18 14l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div>Selecciona origen y destino,<br>luego presiona Buscar Ruta.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- PANEL: Visualización BFS -->
+    <div class="panel full-col">
+      <div class="panel-title">
+        <svg viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        Visualización BFS en Tiempo Real
+      </div>
+
+      <div class="step-info" id="step-info">
+        <span class="badge blue" id="badge-frontera">Frontera: 0</span>
+        <span class="badge amber" id="badge-visitados">Visitados: 0</span>
+        <span class="badge green" id="badge-paso">Paso: 0</span>
+      </div>
+
+      <div class="vis-area">
+        <div class="node-grid" id="node-grid">
+          <div style="font-size:11px;color:var(--text2);padding:8px;">
+            El BFS aparecerá aquí al iniciar la búsqueda...
+          </div>
+        </div>
+      </div>
+
+      <div class="log-label">Registro de búsqueda</div>
+      <div class="log-area" id="log-area">
+        <div class="log-entry" style="font-style:italic;">
+          El registro aparecerá durante la búsqueda...
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const CIUDADES = [
+    { codigo: 'MEX', nombre: 'Ciudad de México' },
+    { codigo: 'GDL', nombre: 'Guadalajara'       },
+    { codigo: 'MTY', nombre: 'Monterrey'         },
+    { codigo: 'CUN', nombre: 'Cancún'            },
+    { codigo: 'TIJ', nombre: 'Tijuana'           },
+    { codigo: 'MID', nombre: 'Mérida'            },
+    { codigo: 'OAX', nombre: 'Oaxaca'            },
+    { codigo: 'PVR', nombre: 'Puerto Vallarta'   },
+    { codigo: 'AGU', nombre: 'Aguascalientes'    },
+    { codigo: 'VSA', nombre: 'Villahermosa'      },
+    { codigo: 'SLP', nombre: 'S.L. Potosí'       },
+    { codigo: 'ZIH', nombre: 'Zihuatanejo'       },
+    { codigo: 'HMO', nombre: 'Hermosillo'        },
+    { codigo: 'CJS', nombre: 'Ciudad Juárez'     },
+    { codigo: 'MZT', nombre: 'Mazatlán'          },
+    { codigo: 'CUU', nombre: 'Chihuahua'         },
+  ];
+
+  const VUELOS = {
+    MEX: ['GDL','MTY','CUN','OAX','MID','VSA','SLP','ZIH'],
+    GDL: ['MEX','MTY','TIJ','PVR','AGU','MZT','CUU'],
+    MTY: ['MEX','GDL','TIJ','SLP','CUU','CJS','HMO'],
+    CUN: ['MEX','MID','VSA','OAX'],
+    TIJ: ['GDL','MTY','HMO','CJS','MZT'],
+    MID: ['MEX','CUN','VSA'],
+    OAX: ['MEX','CUN','ZIH','VSA'],
+    PVR: ['GDL','MEX','ZIH','MZT'],
+    AGU: ['GDL','MEX','SLP'],
+    VSA: ['MEX','CUN','MID','OAX'],
+    SLP: ['MEX','GDL','MTY','AGU'],
+    ZIH: ['MEX','OAX','PVR'],
+    HMO: ['MTY','TIJ','CJS','MZT'],
+    CJS: ['MTY','TIJ','HMO','CUU'],
+    MZT: ['GDL','TIJ','PVR','HMO','CUU'],
+    CUU: ['GDL','MTY','CJS','MZT'],
+  };
+
+  const SPEEDS       = { 1:50, 2:150, 3:350, 4:600, 5:1000 };
+  const SPEED_LABELS = { 1:'Muy rápido', 2:'Rápido', 3:'Normal', 4:'Lento', 5:'Muy lento' };
+
+  let bfsRunning = false;
+  let bfsTimeout = null;
+
+  class Nodo {
+    constructor(datos, padre = null) {
+      this.datos = datos;
+      this.padre = padre;
+    }
+    getDatos()  { return this.datos; }
+    getPadre()  { return this.padre; }
+    igual(otro) { return this.datos === otro.datos; }
+    enLista(lista) { return lista.some(n => n.getDatos() === this.datos); }
+    caminoHastaRaiz() {
+      const camino = [];
+      let n = this;
+      while (n !== null) {
+        camino.unshift(n.getDatos());
+        n = n.getPadre();
+      }
+      return camino;
+    }
+  }
+
+  function getCiudad(codigo) {
+    return CIUDADES.find(c => c.codigo === codigo);
+  }
+
+  function poblarSelects() {
+    ['sel-origen','sel-destino'].forEach((id, i) => {
+      const sel = document.getElementById(id);
+      CIUDADES.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.codigo;
+        opt.textContent = `${c.nombre} (${c.codigo})`;
+        if (i === 0 && c.codigo === 'MEX') opt.selected = true;
+        if (i === 1 && c.codigo === 'CUN') opt.selected = true;
+        sel.appendChild(opt);
+      });
+    });
+  }
+
+  function drawStars() {
+    const svg = document.getElementById('stars-svg');
+    let html = '';
+    for (let i = 0; i < 80; i++) {
+      const x  = Math.random() * 100;
+      const y  = Math.random() * 100;
+      const r  = Math.random() * 1.2 + 0.3;
+      const op = (Math.random() * 0.4 + 0.1).toFixed(2);
+      html += `<circle cx="${x}%" cy="${y}%" r="${r}" fill="white" opacity="${op}"/>`;
+    }
+    svg.innerHTML = html;
+  }
+
+  function log(msg, type = '') {
+    const area = document.getElementById('log-area');
+    const div  = document.createElement('div');
+    div.className = 'log-entry ' + type;
+    div.textContent = msg;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function updateBadges(frontera, visitados, paso) {
+    document.getElementById('badge-frontera').textContent = `Frontera: ${frontera}`;
+    document.getElementById('badge-visitados').textContent = `Visitados: ${visitados}`;
+    document.getElementById('badge-paso').textContent = `Paso: ${paso}`;
+  }
+
+  function renderNodes(visitados, frontera, current, solucion) {
+    const grid = document.getElementById('node-grid');
+    grid.innerHTML = '';
+    CIUDADES.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'vnode';
+      div.title = c.nombre;
+      if (solucion && solucion.includes(c.codigo))
+        div.className += ' solution';
+      else if (c.codigo === current)
+        div.className += ' current';
+      else if (frontera.includes(c.codigo))
+        div.className += ' frontier';
+      else if (visitados.includes(c.codigo))
+        div.className += ' visited';
+      div.textContent = c.codigo;
+      grid.appendChild(div);
+    });
+  }
+
+  function mostrarResultado(camino) {
+    const panel = document.getElementById('resultado-panel');
+    if (!camino) {
+      panel.innerHTML = `<div class="no-route">✗ No existe ruta entre estas ciudades</div>`;
+      return;
+    }
+    const estadisticas = `
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat-val gold">${camino.length}</span>
+          <span class="stat-lbl">Ciudades</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val">${camino.length - 1}</span>
+          <span class="stat-lbl">Escalas</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val green">${((camino.length - 1) * 1.5).toFixed(1)}h</span>
+          <span class="stat-lbl">Est. viaje</span>
+        </div>
+      </div>`;
+    let ruta = '<div class="route-container"><div class="route-track">';
+    camino.forEach((cod, i) => {
+      const c   = getCiudad(cod);
+      const cls = i === 0 ? 'start' : (i === camino.length - 1 ? 'end' : '');
+      ruta += `
+        <div class="route-city">
+          <div class="city-dot ${cls}">${cod}</div>
+          <div class="city-name ${cls ? 'bold' : ''}">${c ? c.nombre : cod}</div>
+        </div>`;
+      if (i < camino.length - 1) {
+        ruta += `
+          <div class="flight-arrow">
+            <div class="plane-icon">✈</div>
+            <div class="arrow-line"></div>
+          </div>`;
+      }
+    });
+    ruta += '</div></div>';
+    panel.innerHTML = estadisticas + ruta;
+  }
+
+  function resetear() {
+    if (bfsTimeout) clearTimeout(bfsTimeout);
+    bfsRunning = false;
+    document.getElementById('node-grid').innerHTML =
+      '<div style="font-size:11px;color:var(--text2);padding:8px;">El BFS aparecerá aquí al iniciar la búsqueda...</div>';
+    document.getElementById('log-area').innerHTML =
+      '<div class="log-entry" style="font-style:italic;">El registro aparecerá durante la búsqueda...</div>';
+    updateBadges(0, 0, 0);
+    document.getElementById('resultado-panel').innerHTML = `
+      <div class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="1"/>
+          <path d="M12 20h16M18 14l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>Selecciona origen y destino,<br>luego presiona Buscar Ruta.</div>
+      </div>`;
+    document.getElementById('btn-buscar').disabled = false;
+  }
+
+  async function iniciarBFS() {
+    if (bfsRunning) return;
+    const origen  = document.getElementById('sel-origen').value;
+    const destino = document.getElementById('sel-destino').value;
+    if (origen === destino) {
+      alert('El origen y destino deben ser diferentes.');
+      return;
+    }
+    bfsRunning = true;
+    document.getElementById('btn-buscar').disabled = true;
+    document.getElementById('log-area').innerHTML  = '';
+    document.getElementById('node-grid').innerHTML = '';
+    document.getElementById('resultado-panel').innerHTML =
+      `<div class="empty-state" style="padding:16px;"><div style="color:var(--gold);">Buscando ruta BFS...</div></div>`;
+    const speedVal = parseInt(document.getElementById('speed-range').value);
+    const delay    = SPEEDS[speedVal] || 350;
+    log(`✈ Iniciando: ${getCiudad(origen).nombre} → ${getCiudad(destino).nombre}`, 'highlight');
+    const nodoInicial   = new Nodo(origen, null);
+    let nodosFrontera   = [nodoInicial];
+    let nodosVisitados  = [];
+    let paso            = 0;
+    let solucionado     = false;
+    const sleep = ms => new Promise(r => { bfsTimeout = setTimeout(r, ms); });
+    while (!solucionado && nodosFrontera.length > 0) {
+      if (!bfsRunning) break;
+      const nodo = nodosFrontera.shift();
+      nodosVisitados.push(nodo);
+      paso++;
+      const codsVisitados = nodosVisitados.map(n => n.getDatos());
+      const codsFrontera  = nodosFrontera.map(n => n.getDatos());
+      updateBadges(codsFrontera.length, codsVisitados.length, paso);
+      renderNodes(codsVisitados, codsFrontera, nodo.getDatos(), null);
+      log(`Paso ${paso}: Explorando ${nodo.getDatos()} — ${getCiudad(nodo.getDatos())?.nombre || ''}`);
+      if (nodo.getDatos() === destino) {
+        solucionado = true;
+        log(`✓ ¡Solución encontrada en ${paso} pasos!`, 'found');
+        const camino = nodo.caminoHastaRaiz();
+        renderNodes(codsVisitados, codsFrontera, null, camino);
+        mostrarResultado(camino);
+        bfsRunning = false;
+        document.getElementById('btn-buscar').disabled = false;
+        break;
+      }
+      const vecinos = VUELOS[nodo.getDatos()] || [];
+      for (const vecino of vecinos) {
+        const nodoVecino = new Nodo(vecino, nodo);
+        if (!nodoVecino.enLista(nodosVisitados) && !nodoVecino.enLista(nodosFrontera)) {
+          nodosFrontera.push(nodoVecino);
+          log(`  → Frontera: ${vecino} — ${getCiudad(vecino)?.nombre || ''}`);
+        }
+      }
+      await sleep(delay);
+    }
+    if (!solucionado && bfsRunning) {
+      log('✗ No se encontró ruta.', 'highlight');
+      mostrarResultado(null);
+      bfsRunning = false;
+      document.getElementById('btn-buscar').disabled = false;
+    }
+  }
+
+  document.getElementById('speed-range').addEventListener('input', function () {
+    document.getElementById('speed-label').textContent = SPEED_LABELS[this.value] || 'Normal';
+  });
+
+  drawStars();
+  poblarSelects();
+</script>
+</body>
+</html>
